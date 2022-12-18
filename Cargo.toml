@@ -1,0 +1,12 @@
+[package]
+name = "data-structures"
+version = "0.1.0"
+edition = "2021"
+authors= ["metegenez"]
+categories = ["data-structures","algorithms","science"]
+keywords = ["streaming-algorithm","probabilistic","sketch","data-structure","hyperloglog"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+twox-hash = "1.6.3"

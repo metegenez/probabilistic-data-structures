@@ -18,53 +18,44 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-use rand::Rng;
 use std::cmp::max;
 use std::hash::{Hash, Hasher};
+use twox_hash::xxh3::Hash64;
 
-struct CountMinSketch<T> {
+struct CountMinSketch {
     counts: Vec<Vec<u64>>,
-    hash_functions: Vec<Box<dyn Fn(&T) -> u64>>,
 }
 
-impl<T: Sized + Hash> CountMinSketch<T> {
+fn hash_once<T: Sized + Hash>(hasher: &mut Hash64, item: &T) -> u64 {
+    item.hash(hasher);
+    hasher.finish()
+}
+
+impl CountMinSketch {
     fn new(probability: f64, tolerance: f64) -> Self {
         let width = Self::optimal_width(tolerance);
         let depth = Self::optimal_depth(probability);
-        let mut rng = rand::thread_rng();
-        let mut hash_functions: Vec<Box<dyn Fn(&T) -> u64>> = Vec::new();
-        for _ in 0..depth {
-            let a: u64 = rng.gen_range(0..u64::pow(10, 9));
-            let b: u64 = rng.gen_range(0..u64::pow(10, 9));
-            let p: u64 = rng.gen_range(0..u64::pow(10, 9));
-            let modulus: u64 = rng.gen_range(0..u64::pow(10, 9));
-            hash_functions.push(Box::new(move |x| {
-                let mut hasher = std::collections::hash_map::DefaultHasher::new();
-                x.hash(&mut hasher);
-                let h_modulus = hasher.finish() % modulus;
-                ((a * h_modulus + b) % p) % width as u64
-            }));
-        }
-
         Self {
             counts: vec![vec![0; width]; depth],
-            hash_functions,
         }
     }
 
-    fn update(&mut self, item: T, count: u64) {
-        for i in 0..self.hash_functions.len() {
-            let hash_function = &self.hash_functions[i];
-            let index = (hash_function)(&item) as usize;
-            self.counts[i][index] += count;
+    fn update<T: Sized + Hash>(&mut self, item: T, count: u64) {
+        for (seed, row) in self.counts.iter_mut().enumerate() {
+            let mut hash_function = Hash64::with_seed(seed as u64);
+            let index = hash_once(&mut hash_function, &item) as usize % row.len();
+            row[index] += count;
         }
     }
 
-    fn estimate(&self, item: T) -> u64 {
-        self.hash_functions
+    fn estimate<T: Sized + Hash + std::fmt::Debug>(&mut self, item: T) -> u64 {
+        self.counts
             .iter()
-            .zip(&self.counts)
-            .map(|(hash_function, row)| row[(hash_function)(&item) as usize])
+            .enumerate()
+            .map(|(seed, row)| {
+                let mut hash_function = Hash64::with_seed(seed as u64);
+                row[hash_once(&mut hash_function, &item) as usize % row.len()]
+            })
             .min()
             .unwrap_or(0)
     }
@@ -87,15 +78,15 @@ impl<T: Sized + Hash> CountMinSketch<T> {
 
 #[test]
 fn test_count_min_sketch() {
-    let mut sketch = CountMinSketch::<&str>::new(0.95, 10.0 / 100.0);
+    let mut sketch = CountMinSketch::new(0.90, 40.0 / 100.0);
 
     sketch.update("apple", 1);
-    sketch.update("banana", 2);
+    sketch.update("banana", 10);
+    sketch.update("cherry", 5);
     sketch.update("apple", 3);
-    sketch.update("cherry", 4);
 
     assert_eq!(sketch.estimate("apple"), 4);
-    assert_eq!(sketch.estimate("banana"), 2);
-    assert_eq!(sketch.estimate("cherry"), 4);
+    assert_eq!(sketch.estimate("banana"), 10);
+    assert_eq!(sketch.estimate("cherry"), 5);
     assert_eq!(sketch.estimate("durian"), 0);
 }

@@ -9,4 +9,4 @@ keywords = ["streaming-algorithm","probabilistic","sketch","data-structure","hyp
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-rand = "0.8.5"
+twox-hash = "1.6.3"

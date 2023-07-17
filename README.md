@@ -1,7 +1,7 @@
 ## Collection of algorithms and data structures in Rust
 #### Data structures
 - [ ] Bloom filter
-+ [x] [Count min sketch]((src/count_min.rs))
++ [x] [Count min sketch](src/count_min.rs)
 
 
 ## **Contributions**
